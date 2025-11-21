@@ -1,14 +1,15 @@
-name: Release
+﻿name: AutoBuild
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+    branches: [dev]         # dev 分支 push 时触发
+  schedule:
+    - cron: '0 0 * * *'    # 每天 00:00 UTC 构建一次 Nightly
+  workflow_dispatch:        # 手动触发
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: autobuild-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,8 +40,10 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout dev branch
         uses: actions/checkout@v4
+        with:
+          ref: dev
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-20.04'
@@ -64,7 +67,7 @@ jobs:
           workspaces: './src-tauri -> target'
           cache-on-failure: true
           cache-targets: true
-          shared-key: tauri-${{ matrix.platform }}
+          shared-key: tauri-${{ matrix.platform }}-autobuild
 
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
@@ -79,9 +82,9 @@ jobs:
           path: |
             ~/.npm
             ~/.cache/vite
-          key: ${{ runner.os }}-node-vite-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-node-vite-${{ hashFiles('**/package-lock.json') }}-autobuild
           restore-keys: |
-            ${{ runner.os }}-node-vite-
+            ${{ runner.os }}-node-vite-autobuild-
 
       - name: Install frontend dependencies
         run: npm ci
@@ -92,39 +95,22 @@ jobs:
           path: |
             ${{ github.workspace }}/src-tauri/target
             ~/.cache/tauri
-          key: ${{ runner.os }}-tauri-${{ hashFiles('**/Cargo.lock', '**/package-lock.json') }}-${{ matrix.platform }}
+          key: ${{ runner.os }}-tauri-${{ hashFiles('**/Cargo.lock', '**/package-lock.json') }}-${{ matrix.platform }}-autobuild
           restore-keys: |
-            ${{ runner.os }}-tauri-${{ hashFiles('**/Cargo.lock', '**/package-lock.json') }}-
-            ${{ runner.os }}-tauri-
+            ${{ runner.os }}-tauri-autobuild-
 
-      - name: Build the app
+      - name: Build Nightly app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Antigravity Agent v__VERSION__'
-          releaseBody: |
-            ## 📥 下载安装
-            
-            ### Windows
-            - **安装版**（推荐）: `Antigravity Agent_x.x.x_x64-setup.exe` - 支持自动更新
-            - **便携版**: `Antigravity-Agent-x86_64-Portable.zip` - 解压即用
-            
-            ### macOS
-            - **Apple Silicon**: `Antigravity Agent_aarch64.dmg`
-            - **Intel Mac**: `Antigravity Agent_x64.dmg`
-            
-            ### Linux
-            - **AppImage**: `antigravity-agent_x.x.x_amd64.AppImage` - 通用格式
-            - **Debian/Ubuntu**: `antigravity-agent_x.x.x_amd64.deb`
-            
-            ---
-            🙏 感谢使用！如果觉得有用，请给我们一个 ⭐️
-          releaseDraft: true
-          prerelease: false
+          tagName: autobuild
+          releaseName: 'Antigravity Agent Nightly'
+          releaseBody: 'Nightly build from dev branch.'
+          releaseDraft: false
+          prerelease: true
           includeDebug: false
           includeRelease: true
           args: --target ${{ matrix.target }}
@@ -133,7 +119,6 @@ jobs:
         if: startsWith(matrix.platform, 'macos')
         shell: bash
         run: |
-          # 为 macOS 更新包添加架构后缀以区分 ARM64 和 Intel
           cd src-tauri/target/${{ matrix.target }}/release/bundle/macos/
           if [ -f "Antigravity Agent.app.tar.gz" ]; then
             mv "Antigravity Agent.app.tar.gz" "Antigravity Agent_${{ matrix.arch }}.app.tar.gz"
@@ -150,18 +135,17 @@ jobs:
         run: |
           cd src-tauri/target/${{ matrix.target }}/release/bundle/macos/
           if [ -f "Antigravity Agent_${{ matrix.arch }}.app.tar.gz" ]; then
-            gh release upload ${{ github.ref_name }} "Antigravity Agent_${{ matrix.arch }}.app.tar.gz" --clobber
+            gh release upload autobuild "Antigravity Agent_${{ matrix.arch }}.app.tar.gz" --clobber
           fi
           if [ -f "Antigravity Agent_${{ matrix.arch }}.app.tar.gz.sig" ]; then
-            gh release upload ${{ github.ref_name }} "Antigravity Agent_${{ matrix.arch }}.app.tar.gz.sig" --clobber
+            gh release upload autobuild "Antigravity Agent_${{ matrix.arch }}.app.tar.gz.sig" --clobber
           fi
-          echo "✅ Uploaded renamed macOS artifacts to ${{ github.ref_name }}"
+          echo "✅ Uploaded renamed macOS artifacts"
 
       - name: Create Windows Portable Version
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          # 创建 Windows 便携版 (单个 exe 压缩包)
           $exePath = "src-tauri\target\${{ matrix.target }}\release\antigravity-agent.exe"
           $outputDir = "portable-package"
           $zipPath = "src-tauri\target\${{ matrix.target }}\release\bundle\Antigravity-Agent-${{ matrix.arch }}-Portable.zip"
@@ -171,12 +155,10 @@ jobs:
             Copy-Item $exePath "$outputDir\Antigravity Agent.exe"
             Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath -Force
             Remove-Item -Recurse -Force $outputDir
-            Write-Host "✅ Created portable version: $zipPath"
-          } else {
-            Write-Host "⚠️ Binary not found at: $exePath"
+            Write-Host "✅ Created portable version for nightly"
           }
 
-      - name: Upload Windows Portable to Release
+      - name: Upload Windows Portable to Nightly Release
         if: matrix.platform == 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -184,6 +166,6 @@ jobs:
         run: |
           $zipPath = "src-tauri\target\${{ matrix.target }}\release\bundle\Antigravity-Agent-${{ matrix.arch }}-Portable.zip"
           if (Test-Path $zipPath) {
-            gh release upload ${{ github.ref_name }} $zipPath --clobber
-            Write-Host "✅ Uploaded portable version to release"
+            gh release upload autobuild $zipPath --clobber
+            Write-Host "✅ Uploaded portable version to nightly release"
           }

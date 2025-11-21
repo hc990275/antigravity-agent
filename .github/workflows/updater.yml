@@ -1,0 +1,121 @@
+﻿name: Generate updater latest.json
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: updater-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-latest-json:
+    runs-on: ubuntu-latest
+    # 自动触发：只处理正式版本（非 prerelease）
+    # 手动触发：始终执行
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.prerelease == false)
+    steps:
+      - name: Install GitHub CLI and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          type -p gh >/dev/null || curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_$(uname -s | tr '[:upper:]' '[:lower:]')_amd64.tar.gz \
+            | tar xz && sudo mv gh_*/bin/gh /usr/local/bin
+
+      - name: Download release assets (.sig and bundles)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          mkdir -p assets
+          cd assets
+          gh release download "$TAG" --repo "${{ github.repository }}" --clobber
+
+      - name: Generate latest.json
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd assets
+
+          VERSION="${TAG}"
+          PUB_DATE="${{ github.event.release.published_at || '' }}"
+          if [ -z "$PUB_DATE" ]; then
+            PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          fi
+
+          BASE_URL="https://github.com/$REPO/releases/download/$TAG"
+
+          # Tauri 实际生成的文件名（注意空格和命名规范！）
+          # Windows: .nsis.zip 用于更新，不是 .exe
+          WIN_FILE="Antigravity Agent_${VERSION#v}_x64-setup.nsis.zip"
+          WIN_SIG_FILE="$WIN_FILE.sig"
+
+          # macOS: 文件名包含空格，架构后缀在重命名步骤中添加
+          MAC_ARM_FILE="Antigravity Agent_aarch64.app.tar.gz"
+          MAC_ARM_SIG_FILE="$MAC_ARM_FILE.sig"
+          MAC_X64_FILE="Antigravity Agent_x64.app.tar.gz"
+          MAC_X64_SIG_FILE="$MAC_X64_FILE.sig"
+
+          # Linux: Tauri 使用 Debian 命名规范 (amd64 而非 x86_64)
+          LINUX_FILE="antigravity-agent_${VERSION#v}_amd64.AppImage.tar.gz"
+          LINUX_SIG_FILE="$LINUX_FILE.sig"
+
+          # 读取签名文件（Tauri 签名文件内容是 base64 编码）
+          get_sig() {
+            local f="$1"
+            if [ -f "$f" ]; then
+              cat "$f"
+            else
+              echo ""
+            fi
+          }
+
+          SIG_WIN=$(get_sig "$WIN_SIG_FILE")
+          SIG_MAC_ARM=$(get_sig "$MAC_ARM_SIG_FILE")
+          SIG_MAC_X64=$(get_sig "$MAC_X64_SIG_FILE")
+          SIG_LINUX=$(get_sig "$LINUX_SIG_FILE")
+
+          # URL 编码空格为 %20
+          URL_WIN="$BASE_URL/${WIN_FILE// /%20}"
+          URL_MAC_ARM="$BASE_URL/${MAC_ARM_FILE// /%20}"
+          URL_MAC_X64="$BASE_URL/${MAC_X64_FILE// /%20}"
+          URL_LINUX="$BASE_URL/$LINUX_FILE"
+
+          cat > latest.json << JSON
+          {
+            "version": "$VERSION",
+            "notes": "${{ github.event.release.body || '' }}",
+            "pub_date": "$PUB_DATE",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "$SIG_WIN",
+                "url": "$URL_WIN"
+              },
+              "darwin-aarch64": {
+                "signature": "$SIG_MAC_ARM",
+                "url": "$URL_MAC_ARM"
+              },
+              "darwin-x86_64": {
+                "signature": "$SIG_MAC_X64",
+                "url": "$URL_MAC_X64"
+              },
+              "linux-x86_64": {
+                "signature": "$SIG_LINUX",
+                "url": "$URL_LINUX"
+              }
+            }
+          }
+          JSON
+
+          echo "✅ Generated latest.json:"
+          cat latest.json
+
+      - name: Upload latest.json to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          cd assets
+          gh release upload "$TAG" latest.json --repo "${{ github.repository }}" --clobber

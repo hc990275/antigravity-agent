@@ -6,7 +6,8 @@ pub fn get_antigravity_data_dir() -> Option<PathBuf> {
     match std::env::consts::OS {
         "windows" => {
             // Windows: %APPDATA%\Antigravity\User\globalStorage\
-            dirs::config_dir().map(|path| path.join("Antigravity").join("User").join("globalStorage"))
+            dirs::config_dir()
+                .map(|path| path.join("Antigravity").join("User").join("globalStorage"))
         }
         "macos" => {
             // macOS: 基于 product.json 中的 dataFolderName: ".antigravity" 配置
@@ -16,10 +17,12 @@ pub fn get_antigravity_data_dir() -> Option<PathBuf> {
         "linux" => {
             // Linux: 基于 product.json 中的 dataFolderName: ".antigravity" 配置
             // 优先使用 ~/.config/Antigravity/User/globalStorage/，备用 ~/.local/share/Antigravity/User/globalStorage/
-            dirs::config_dir()  // 优先：~/.config
+            dirs::config_dir() // 优先：~/.config
                 .map(|path| path.join("Antigravity").join("User").join("globalStorage"))
-                .or_else(|| {  // 备用：~/.local/share
-                    dirs::data_dir().map(|path| path.join("Antigravity").join("User").join("globalStorage"))
+                .or_else(|| {
+                    // 备用：~/.local/share
+                    dirs::data_dir()
+                        .map(|path| path.join("Antigravity").join("User").join("globalStorage"))
                 })
         }
         _ => {
@@ -74,8 +77,8 @@ pub fn get_all_antigravity_db_paths() -> Vec<PathBuf> {
             if let Ok(entries) = std::fs::read_dir(&install_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.is_file() &&
-                       path.file_name().is_some_and(|name| name == "state.vscdb") {
+                    if path.is_file() && path.file_name().is_some_and(|name| name == "state.vscdb")
+                    {
                         db_paths.push(path);
                     }
                 }
@@ -103,7 +106,11 @@ pub fn kill_antigravity_processes() -> Result<String, String> {
                 if output.status.success() {
                     return Ok(format!("已成功关闭Antigravity进程 ({})", process_name));
                 } else {
-                    last_error = format!("关闭进程 {} 失败: {:?}", process_name, String::from_utf8_lossy(&output.stderr));
+                    last_error = format!(
+                        "关闭进程 {} 失败: {:?}",
+                        process_name,
+                        String::from_utf8_lossy(&output.stderr)
+                    );
                 }
             }
 
@@ -111,10 +118,7 @@ pub fn kill_antigravity_processes() -> Result<String, String> {
         }
         "macos" | "linux" => {
             // macOS/Linux: 使用pkill命令，尝试多种进程名模式
-            let process_patterns = vec![
-                "Antigravity",
-                "antigravity"
-            ];
+            let process_patterns = vec!["Antigravity", "antigravity"];
             let mut last_error = String::new();
 
             for pattern in process_patterns {
@@ -126,12 +130,16 @@ pub fn kill_antigravity_processes() -> Result<String, String> {
                 if output.status.success() {
                     return Ok(format!("已成功关闭Antigravity进程 (模式: {})", pattern));
                 } else {
-                    last_error = format!("关闭进程失败 (模式: {}): {:?}", pattern, String::from_utf8_lossy(&output.stderr));
+                    last_error = format!(
+                        "关闭进程失败 (模式: {}): {:?}",
+                        pattern,
+                        String::from_utf8_lossy(&output.stderr)
+                    );
                 }
             }
 
             Err(last_error)
         }
-        _ => Err("不支持的操作系统".to_string())
+        _ => Err("不支持的操作系统".to_string()),
     }
 }

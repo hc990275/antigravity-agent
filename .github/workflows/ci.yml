@@ -2,9 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, dev]
+    tags: ['v*']
   pull_request:
-    branches: [master]
+    branches: [master, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -37,10 +42,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -60,12 +70,17 @@ jobs:
         run: cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings
 
   build-test:
+    needs: [test-frontend, test-backend]
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
+        platform:
+          - macos-latest
+          - ubuntu-20.04
+          - windows-latest
 
     runs-on: ${{ matrix.platform }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,7 +89,12 @@ jobs:
         if: matrix.platform == 'ubuntu-20.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -102,7 +122,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: npm run tauri
-          args: '--debug'
+          args: --debug
 
   security-scan:
     runs-on: ubuntu-latest
@@ -110,11 +130,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
       - name: Run cargo audit
-        run: cd src-tauri && cargo install cargo-audit && cargo audit
+        run: cd src-tauri && cargo audit
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
