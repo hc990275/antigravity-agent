@@ -1,4 +1,4 @@
-﻿name: Generate updater latest.json
+name: Generate updater latest.json
 
 on:
   release:
