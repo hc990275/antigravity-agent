@@ -13,23 +13,19 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
     onPathSelected,
     onCancel,
 }) => {
-    // 数据库路径状态
     const [dataPath, setDataPath] = useState<string>('');
     const [isDataPathValid, setIsDataPathValid] = useState(false);
     const [isValidatingData, setIsValidatingData] = useState(false);
 
-    // 可执行文件路径状态
     const [execPath, setExecPath] = useState<string>('');
     const [isExecPathValid, setIsExecPathValid] = useState(false);
     const [isValidatingExec, setIsValidatingExec] = useState(false);
 
-    // 通用状态
     const [isSaving, setIsSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string>('');
 
     if (!isOpen) return null;
 
-    // 浏览数据目录
     const handleBrowseDataPath = async () => {
         try {
             const result = await open({
@@ -57,7 +53,6 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
         }
     };
 
-    // 浏览可执行文件
     const handleBrowseExecPath = async () => {
         try {
             const result = await open({
@@ -89,9 +84,7 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
         }
     };
 
-    // 保存配置
     const handleSave = async () => {
-        // 数据库路径是必须的
         if (!dataPath || !isDataPathValid) {
             setErrorMessage('请先选择有效的数据目录');
             return;
@@ -100,10 +93,8 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
         try {
             setIsSaving(true);
 
-            // 保存数据库路径
             await AntigravityPathService.savePath(dataPath);
 
-            // 保存可执行文件路径（可选）
             if (execPath && isExecPathValid) {
                 await AntigravityPathService.saveExecutable(execPath);
             }
@@ -119,46 +110,47 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
     const canSave = isDataPathValid && !isSaving;
 
     return (
-        <div className="DialogOverlay">
-            <div className="DialogContent" style={{ maxWidth: '600px' }}>
-                <div className="DialogTitle">配置 Antigravity 路径</div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4">
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                    配置 Antigravity 路径
+                </h2>
 
-                <div className="DialogDescription">
-                    <p className="mb-3">无法自动检测到 Antigravity，请手动配置以下路径：</p>
-                </div>
+                <p className="text-gray-600 mb-6">
+                    无法自动检测到 Antigravity，请手动配置以下路径：
+                </p>
 
-                {/* 数据库路径部分 */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-white">
-                            1. 数据目录 <span className="text-red-400">*</span>
+                        <h3 className="text-sm font-semibold text-gray-900">
+                            1. 数据目录 <span className="text-red-500">*</span>
                         </h3>
                     </div>
-                    <p className="text-xs text-gray-400 mb-2">
-                        包含 <code className="bg-gray-700 px-1 rounded">state.vscdb</code> 文件的目录
+                    <p className="text-xs text-gray-500 mb-2">
+                        包含 <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">state.vscdb</code> 文件的目录
                     </p>
 
                     <button
                         onClick={handleBrowseDataPath}
                         disabled={isValidatingData || isSaving}
-                        className="Button Button--secondary w-full mb-2"
+                        className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
                     >
                         {isValidatingData ? '验证中...' : '浏览数据目录...'}
                     </button>
 
                     {dataPath && (
                         <div className="mt-2">
-                            <p className="text-xs bg-gray-700 p-2 rounded break-all">
+                            <p className="text-xs bg-gray-100 p-2 rounded break-all text-gray-700">
                                 {dataPath}
                             </p>
                             {isDataPathValid && (
-                                <p className="text-xs text-green-400 mt-1">✅ 路径有效</p>
+                                <p className="text-xs text-green-600 mt-1">✅ 路径有效</p>
                             )}
                         </div>
                     )}
 
                     <details className="mt-2">
-                        <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300">
+                        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                             常见位置参考
                         </summary>
                         <ul className="text-xs text-gray-500 list-disc list-inside space-y-1 mt-1 ml-2">
@@ -169,32 +161,31 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
                     </details>
                 </div>
 
-                {/* 可执行文件路径部分 */}
-                <div className="mb-4">
+                <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-semibold text-white">
-                            2. 可执行文件 <span className="text-gray-500">(可选)</span>
+                        <h3 className="text-sm font-semibold text-gray-900">
+                            2. 可执行文件 <span className="text-gray-400">(可选)</span>
                         </h3>
                     </div>
-                    <p className="text-xs text-gray-400 mb-2">
+                    <p className="text-xs text-gray-500 mb-2">
                         用于启动 Antigravity 应用程序
                     </p>
 
                     <button
                         onClick={handleBrowseExecPath}
                         disabled={isValidatingExec || isSaving}
-                        className="Button Button--secondary w-full mb-2"
+                        className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
                     >
                         {isValidatingExec ? '验证中...' : '浏览可执行文件...'}
                     </button>
 
                     {execPath && (
                         <div className="mt-2">
-                            <p className="text-xs bg-gray-700 p-2 rounded break-all">
+                            <p className="text-xs bg-gray-100 p-2 rounded break-all text-gray-700">
                                 {execPath}
                             </p>
                             {isExecPathValid && (
-                                <p className="text-xs text-green-400 mt-1">✅ 文件有效</p>
+                                <p className="text-xs text-green-600 mt-1">✅ 文件有效</p>
                             )}
                         </div>
                     )}
@@ -205,23 +196,23 @@ const AntigravityPathDialog: React.FC<AntigravityPathDialogProps> = ({
                 </div>
 
                 {errorMessage && (
-                    <div className="mb-4 p-2 bg-red-900/30 border border-red-500 rounded">
-                        <p className="text-sm text-red-300">{errorMessage}</p>
+                    <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700">{errorMessage}</p>
                     </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                     <button
                         onClick={onCancel}
                         disabled={isSaving}
-                        className="Button Button--secondary flex-1"
+                        className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
                     >
                         退出应用
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={!canSave}
-                        className="Button bg-blue-600 hover:bg-blue-700 text-white flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSaving ? '保存中...' : '保存并继续'}
                     </button>

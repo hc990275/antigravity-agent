@@ -5,7 +5,7 @@ import { Trash2 } from 'lucide-react';
 import { maskBackupFilename } from '../utils/username-masking';
 import { StandardTooltip } from './ui/tooltip';
 
-const ManageSection = ({ backups, showStatus, onRefresh }) => {
+const ManageSection = ({ backups, showStatus, onRefresh, isInitialLoading = false }) => {
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -100,7 +100,12 @@ const ManageSection = ({ backups, showStatus, onRefresh }) => {
           )}
         </div>
         <div className={backups.length === 0 ? "backup-list-empty" : "backup-list-vertical"}>
-          {backups.length === 0 ? (
+          {isInitialLoading ? (
+            <div className="flex flex-col items-center justify-center py-8 text-light-text-muted">
+              <div className="animate-spin h-8 w-8 border-3 border-gray-400 border-t-transparent rounded-full mb-3"></div>
+              <p>正在加载备份列表...</p>
+            </div>
+          ) : backups.length === 0 ? (
             <p className="text-light-text-muted">暂无用户</p>
           ) : (
             backups.map((backup, index) => (

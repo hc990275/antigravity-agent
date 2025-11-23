@@ -72,6 +72,9 @@ pub async fn detect_antigravity_installation() -> Result<serde_json::Value, Stri
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
             
+            println!("📁 检测到 Antigravity 数据库: {}", db_path.display());
+            println!("📂 Antigravity 数据目录: {}", data_dir);
+            
             return Ok(serde_json::json!({
                 "found": true,
                 "path": data_dir,
@@ -81,6 +84,7 @@ pub async fn detect_antigravity_installation() -> Result<serde_json::Value, Stri
     }
     
     // 4. 未找到
+    println!("⚠️ 未找到 Antigravity 数据库，请手动选择路径");
     Ok(serde_json::json!({
         "found": false,
         "path": null,
@@ -109,6 +113,8 @@ pub async fn detect_antigravity_executable() -> Result<serde_json::Value, String
     // 3. 尝试自动检测
     let detected_path = crate::antigravity_starter::detect_antigravity_executable();
     if let Some(exec_path) = detected_path {
+        println!("✅ 检测到 Antigravity 可执行文件: {}", exec_path.display());
+        
         return Ok(serde_json::json!({
             "found": true,
             "path": exec_path.to_string_lossy().to_string(),
@@ -117,6 +123,7 @@ pub async fn detect_antigravity_executable() -> Result<serde_json::Value, String
     }
     
     // 4. 未找到
+    println!("⚠️ 未找到 Antigravity 可执行文件，启动功能可能不可用");
     Ok(serde_json::json!({
         "found": false,
         "path": null,

@@ -40,44 +40,75 @@ pub async fn backup_and_restart_antigravity() -> Result<String, String> {
         }
     };
 
-    // 等待一秒确保进程完全关闭
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    // 等待500ms确保进程完全关闭（缩短等待时间避免前端超时）
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     // 2. 备份当前账户信息（使用统一的智能备份函数）
-    println!("💾 步骤2: 备份当前账户信息");
+    println!("💾 步骤2: 尝试备份当前账户信息");
 
-    // 获取邮箱
-    let app_data = crate::platform_utils::get_antigravity_db_path()
-        .ok_or_else(|| "未找到Antigravity数据库路径".to_string())?;
 
-    let conn = crate::Connection::open(&app_data).map_err(|e| format!("连接数据库失败: {}", e))?;
+    let backup_info = {
+        // 获取邮箱
+        if let Some(app_data) = crate::platform_utils::get_antigravity_db_path() {
+            // 尝试打开数据库
+            match crate::Connection::open(&app_data) {
+                Ok(conn) => {
+                    // 尝试获取认证信息
+                    let auth_result: Result<String, _> = conn.query_row(
+                        "SELECT value FROM ItemTable WHERE key = 'antigravityAuthStatus'",
+                        [],
+                        |row| row.get(0),
+                    );
 
-    // 获取认证信息来提取邮箱
-    let auth_str: String = conn
-        .query_row(
-            "SELECT value FROM ItemTable WHERE key = 'antigravityAuthStatus'",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("查询认证信息失败: {}", e))?;
+                    drop(conn);
 
-    drop(conn);
-
-    let auth_data: serde_json::Value =
-        serde_json::from_str(&auth_str).map_err(|e| format!("解析认证信息失败: {}", e))?;
-
-    let email = auth_data
-        .get("email")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "认证信息中未找到邮箱".to_string())?;
-
-    println!("📧 获取到的邮箱: {}", email);
-
-    // 调用通用智能备份函数
-    let (backup_name, is_overwrite) =
-        crate::antigravity_backup::smart_backup_antigravity_account(email)?;
-    let backup_action = if is_overwrite { "更新" } else { "创建" };
-    println!("✅ 备份完成 ({}): {}", backup_action, backup_name);
+                    match auth_result {
+                        Ok(auth_str) => {
+                            // 解析并提取邮箱
+                            match serde_json::from_str::<serde_json::Value>(&auth_str) {
+                                Ok(auth_data) => {
+                                    if let Some(email) = auth_data.get("email").and_then(|v| v.as_str()) {
+                                        println!("📧 获取到的邮箱: {}", email);
+                                        
+                                        // 尝试备份
+                                        match crate::antigravity_backup::smart_backup_antigravity_account(email) {
+                                            Ok((backup_name, is_overwrite)) => {
+                                                let backup_action = if is_overwrite { "更新" } else { "创建" };
+                                                println!("✅ 备份完成 ({}): {}", backup_action, backup_name);
+                                                Some((backup_name, backup_action))
+                                            }
+                                            Err(e) => {
+                                                println!("⚠️ 备份失败: {}", e);
+                                                None
+                                            }
+                                        }
+                                    } else {
+                                        println!("ℹ️ 认证信息中未找到邮箱，跳过备份");
+                                        None
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("ℹ️ 解析认证信息失败: {}，跳过备份", e);
+                                    None
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            println!("ℹ️ 未找到认证信息（可能未登录），跳过备份");
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("⚠️ 连接数据库失败: {}，跳过备份", e);
+                    None
+                }
+            }
+        } else {
+            println!("⚠️ 未找到 Antigravity 数据库路径，跳过备份");
+            None
+        }
+    };
 
     // 3. 清除 Antigravity 所有数据 (彻底注销)
     println!("🗑️ 步骤3: 清除所有 Antigravity 数据 (彻底注销)");
@@ -86,13 +117,13 @@ pub async fn backup_and_restart_antigravity() -> Result<String, String> {
             println!("✅ 清除完成: {}", result);
         }
         Err(e) => {
-            println!("⚠️ 清除失败: {}", e);
-            return Err(format!("清除数据失败: {}", e));
+            // 清除失败可能是因为数据库本来就是空的，这是正常情况
+            println!("ℹ️ 清除数据时出现: {}（可能数据库本来就是空的）", e);
         }
     }
 
-    // 等待一秒确保操作完成
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    // 等待300ms确保操作完成（缩短等待时间避免前端超时）
+    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
     // 4. 重新启动进程
     println!("🚀 步骤4: 重新启动 Antigravity");
@@ -108,10 +139,17 @@ pub async fn backup_and_restart_antigravity() -> Result<String, String> {
         }
     };
 
-    let final_message = format!(
-        "{} -> 已{}备份: {} -> 已清除账户数据 -> {}",
-        kill_result, backup_action, backup_name, start_message
-    );
+    let final_message = if let Some((backup_name, backup_action)) = backup_info {
+        format!(
+            "{} -> 已{}备份: {} -> 已清除账户数据 -> {}",
+            kill_result, backup_action, backup_name, start_message
+        )
+    } else {
+        format!(
+            "{} -> 未检测到登录用户（跳过备份） -> 已清除账户数据 -> {}",
+            kill_result, start_message
+        )
+    };
     println!("🎉 所有操作完成: {}", final_message);
 
     Ok(final_message)

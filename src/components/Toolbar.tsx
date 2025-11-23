@@ -1,21 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Download, Upload } from 'lucide-react';
 import PasswordDialog from './PasswordDialog';
 import UpdateDialog from './UpdateDialog';
+import ConfirmDialog from './ConfirmDialog';
 import { TooltipProvider } from './ui/tooltip';
 import ToolbarTitle from './ui/toolbar-title';
-import ToolbarActions from './toolbar-actions';
 import SystemTraySwitch from './ui/system-tray-switch';
+import ActionButton from './ui/action-button';
 import { SilentLogExport } from './SilentLogExport';
-import { usePasswordDialog } from '../hooks/use-password-dialog';
 import { useUpdateChecker } from '../hooks/useUpdateChecker';
 import { SystemTrayService } from '../services/system-tray-service';
-
-interface ToolbarProps {
-  onRefresh: () => void;
-  isRefreshing?: boolean;
-  showStatus: (message: string, isError?: boolean) => void;
-  onSettingsClick?: () => void;
-}
 
 interface LoadingState {
   isProcessLoading: boolean;
@@ -23,16 +17,71 @@ interface LoadingState {
   isExporting: boolean;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, isRefreshing = false, showStatus, onSettingsClick }) => {
-  const [loadingState, setLoadingState] = useState<LoadingState>({
-    isProcessLoading: false,
-    isImporting: false,
-    isExporting: false
-  });
+interface PasswordDialogState {
+  isOpen: boolean;
+  title: string;
+  description?: string;
+  requireConfirmation?: boolean;
+  validatePassword?: (password: string) => { isValid: boolean; message?: string };
+  onSubmit: (password: string) => void;
+}
 
+interface ToolbarProps {
+  // 刷新
+  onRefresh: () => void;
+  isRefreshing?: boolean;
+
+  // 配置管理
+  onImport: () => void;
+  onExport: () => void;
+  hasUserData: boolean;
+  isCheckingData: boolean;
+
+  // 进程管理（登录新账户）
+  onBackupAndRestart: () => void;
+
+  // 状态
+  loadingState: LoadingState;
+  showStatus: (message: string, isError?: boolean) => void;
+
+  // 密码对话框
+  passwordDialog: PasswordDialogState;
+  onPasswordDialogCancel: () => void;
+
+  // 设置
+  onSettingsClick?: () => void;
+}
+
+const Toolbar: React.FC<ToolbarProps> = ({
+  onRefresh,
+  isRefreshing = false,
+  onImport,
+  onExport,
+  hasUserData,
+  isCheckingData,
+  onBackupAndRestart,
+  loadingState = { isProcessLoading: false, isImporting: false, isExporting: false },
+  showStatus,
+  passwordDialog = { isOpen: false, title: '', onSubmit: () => { } },
+  onPasswordDialogCancel,
+  onSettingsClick
+}) => {
   // 系统托盘状态
   const [trayEnabled, setTrayEnabled] = useState(false);
   const initializedRef = useRef(false);
+
+  // 确认对话框状态（用于"登录新账户"操作）
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => { }
+  });
 
   // 初始化系统托盘状态 - 只在组件挂载时执行一次
   useEffect(() => {
@@ -79,13 +128,30 @@ const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, isRefreshing = false, show
     }
   };
 
-  // 使用密码对话框 Hook
-  const {
-    passwordDialog,
-    showPasswordDialog,
-    closePasswordDialog,
-    handlePasswordDialogCancel
-  } = usePasswordDialog(showStatus);
+  // 处理登录新账户按钮点击
+  const handleBackupAndRestartClick = () => {
+    console.log('🔘 用户点击登录新账户按钮，显示确认对话框');
+
+    setConfirmDialog({
+      isOpen: true,
+      title: '登录新账户',
+      description: `确定要关闭 Antigravity 并登录新账户吗？
+
+此操作将会：
+1. 关闭所有 Antigravity 进程
+2. 自动备份当前账户信息
+3. 清除 Antigravity 用户信息
+4. 自动重新启动 Antigravity
+
+登录新账户后点击 "刷新" 即可保存新账户
+注意：系统将自动启动 Antigravity，请确保已保存所有重要工作`,
+      onConfirm: async () => {
+        console.log('✅ 用户确认登录新账户操作');
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        onBackupAndRestart();
+      }
+    });
+  };
 
   // 使用自动更新检查 Hook
   const {
@@ -166,17 +232,43 @@ const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, isRefreshing = false, show
                 </svg>
               </button>
 
-              {/* ToolbarActions - 其他按钮 */}
-              <ToolbarActions
-                loadingState={loadingState}
-                isRefreshing={isRefreshing}
+              {/* 操作按钮 */}
+              <ActionButton
+                onClick={handleBackupAndRestartClick}
+                variant="primary"
+                icon={<Plus className="h-4 w-4" />}
+                tooltip="关闭 Antigravity，备份当前用户，清除用户信息，并自动重新启动"
+                isLoading={loadingState.isProcessLoading}
+                loadingText="处理中..."
                 isAnyLoading={isAnyLoading}
-                onRefresh={onRefresh}
-                showStatus={showStatus}
-                setLoadingState={setLoadingState}
-                showPasswordDialog={showPasswordDialog}
-                closePasswordDialog={closePasswordDialog}
-              />
+              >
+                登录新账户
+              </ActionButton>
+
+              <ActionButton
+                onClick={onImport}
+                variant="secondary"
+                icon={<Upload className="h-4 w-4" />}
+                tooltip="导入加密的配置文件"
+                isLoading={loadingState.isImporting}
+                loadingText="导入中..."
+                isAnyLoading={isAnyLoading}
+              >
+                导入
+              </ActionButton>
+
+              <ActionButton
+                onClick={onExport}
+                variant="secondary"
+                icon={<Download className="h-4 w-4" />}
+                tooltip={hasUserData ? "导出为加密配置文件" : "没有用户信息可以导出"}
+                disabled={!hasUserData}
+                isLoading={loadingState.isExporting || isCheckingData}
+                loadingText={isCheckingData ? "检查中..." : "导出中..."}
+                isAnyLoading={isAnyLoading}
+              >
+                导出
+              </ActionButton>
 
               {/* 设置按钮 */}
               {onSettingsClick && (
@@ -204,17 +296,36 @@ const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, isRefreshing = false, show
         </div>
       </div>
 
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          }
+        }}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => {
+          console.log('❌ 用户取消了登录新账户操作');
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
+
+      {/* 密码对话框 */}
       <PasswordDialog
         isOpen={passwordDialog.isOpen}
-        onOpenChange={(open) => !open && handlePasswordDialogCancel()}
+        onOpenChange={(open) => !open && onPasswordDialogCancel()}
         title={passwordDialog.title}
         description={passwordDialog.description}
         requireConfirmation={passwordDialog.requireConfirmation}
         validatePassword={passwordDialog.validatePassword}
         onSubmit={passwordDialog.onSubmit}
-        onCancel={handlePasswordDialogCancel}
+        onCancel={onPasswordDialogCancel}
       />
 
+      {/* 更新对话框 */}
       <UpdateDialog
         isOpen={isUpdateDialogOpen}
         onClose={() => setIsUpdateDialogOpen(false)}
