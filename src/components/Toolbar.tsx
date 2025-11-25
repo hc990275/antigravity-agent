@@ -254,19 +254,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 导出
               </BusinessActionButton>
 
-              {/*<BusinessActionButton*/}
-              {/*  onClick={handleTestLanguageServer}*/}
-              {/*  variant="secondary"*/}
-              {/*  icon={<Activity className="h-4 w-4" />}*/}
-              {/*  tooltip="测试调用语言服务器 GetUserStatus，结果打印到控制台"*/}
-              {/*  isLoading={isTestingLS}*/}
-              {/*  loadingText="测试中..."*/}
-              {/*  isAnyLoading={isAnyLoading}*/}
-              {/*  disabled={isAnyLoading}*/}
-              {/*>*/}
-              {/*  测试语言服务器*/}
-              {/*</BusinessActionButton>*/}
-
               {/* 设置按钮 */}
               {onSettingsClick && (
                 <button
