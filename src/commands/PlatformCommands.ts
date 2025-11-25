@@ -1,0 +1,83 @@
+import { invoke } from '@tauri-apps/api/core';
+import type { PlatformInfo, DetectionResult, PathConfig } from './types/platform.types';
+
+/**
+ * 平台工具命令
+ */
+export class PlatformCommands {
+  /**
+   * 获取平台信息
+   * @returns 平台信息，包含操作系统、架构、路径等
+   */
+  static async getInfo(): Promise<PlatformInfo> {
+    return invoke('get_platform_info');
+  }
+
+  /**
+   * 查找 Antigravity 安装位置
+   * @returns 所有可能的安装路径
+   */
+  static async findInstallations(): Promise<string[]> {
+    return invoke('find_antigravity_installations');
+  }
+
+  /**
+   * 检测 Antigravity 数据库路径
+   * @returns 检测结果
+   */
+  static async detectInstallation(): Promise<DetectionResult> {
+    return invoke('detect_antigravity_installation');
+  }
+
+  /**
+   * 检测 Antigravity 可执行文件路径
+   * @returns 检测结果
+   */
+  static async detectExecutable(): Promise<DetectionResult> {
+    return invoke('detect_antigravity_executable');
+  }
+
+  /**
+   * 验证 Antigravity 数据目录路径
+   * @param path 目录路径
+   * @returns 是否有效
+   */
+  static async validatePath(path: string): Promise<boolean> {
+    return invoke('validate_antigravity_path', { path });
+  }
+
+  /**
+   * 验证 Antigravity 可执行文件路径
+   * @param path 文件路径
+   * @returns 是否有效
+   */
+  static async validateExecutable(path: string): Promise<boolean> {
+    return invoke('validate_antigravity_executable', { path });
+  }
+
+  /**
+   * 保存用户自定义的 Antigravity 数据目录路径
+   * @param path 目录路径
+   * @returns 保存结果消息
+   */
+  static async savePath(path: string): Promise<string> {
+    return invoke('save_antigravity_path', { path });
+  }
+
+  /**
+   * 保存用户自定义的 Antigravity 可执行文件路径
+   * @param path 文件路径
+   * @returns 保存结果消息
+   */
+  static async saveExecutable(path: string): Promise<string> {
+    return invoke('save_antigravity_executable', { path });
+  }
+
+  /**
+   * 获取当前配置的路径
+   * @returns 路径配置
+   */
+  static async getCurrentPaths(): Promise<PathConfig> {
+    return invoke('get_current_paths');
+  }
+}
