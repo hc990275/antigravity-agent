@@ -7,6 +7,7 @@ import useConfigManager from './modules/config-management/useConfigStore';
 import { useAntigravityProcess } from './hooks/use-antigravity-process';
 import { useAntigravityIsRunning } from './hooks/useAntigravityIsRunning';
 import BusinessManageSection from './components/business/ManageSection';
+import BusinessUserDetail from './components/business/UserDetail';
 import StatusNotification from './components/StatusNotification';
 import Toolbar from './components/Toolbar';
 import AntigravityPathDialog from './components/AntigravityPathDialog';
@@ -15,6 +16,7 @@ import PasswordDialog from './components/PasswordDialog';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AntigravityPathService } from './services/antigravity-path-service';
 import { exit } from '@tauri-apps/plugin-process';
+import type { AntigravityAccount } from './commands/types/account.types';
 
 interface Status {
   message: string;
@@ -31,6 +33,8 @@ function AppContent() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDetecting, setIsDetecting] = useState(true);
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
+  const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<AntigravityAccount | null>(null);
 
   // ========== Hook 集成 ==========
   useDevToolsShortcut();
@@ -122,6 +126,17 @@ function AppContent() {
     }
   }, []);
 
+  // 用户详情处理
+  const handleUserClick = useCallback((user: AntigravityAccount) => {
+    setSelectedUser(user);
+    setIsUserDetailOpen(true);
+  }, []);
+
+  const handleUserDetailClose = useCallback(() => {
+    setIsUserDetailOpen(false);
+    setSelectedUser(null);
+  }, []);
+
   // 组件启动时执行初始化
   useEffect(() => {
     initializeApp();
@@ -180,6 +195,7 @@ function AppContent() {
       <div className="container">
         <BusinessManageSection
           showStatus={showStatus}
+          onUserClick={handleUserClick}
         />
       </div>
 
@@ -203,6 +219,12 @@ function AppContent() {
       <BusinessSettingsDialog
         isOpen={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
+      />
+
+      <BusinessUserDetail
+        isOpen={isUserDetailOpen}
+        onOpenChange={handleUserDetailClose}
+        user={selectedUser}
       />
     </>
   );

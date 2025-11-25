@@ -27,7 +27,7 @@ interface AntigravityIsRunningActions {
 }
 
 // 全局定时器 ID
-let checkIntervalId: ReturnType<typeof setInterval> | null = null;
+let checkIntervalId: NodeJS.Timeout | null = null;
 
 // 检查间隔（10 秒）
 const CHECK_INTERVAL = 10000;
@@ -81,7 +81,7 @@ export const useAntigravityIsRunning = create<
     get().checkStatus();
 
     // 启动定时检查
-    checkIntervalId = window.setInterval(() => {
+    checkIntervalId = setInterval(() => {
       get().checkStatus();
     }, CHECK_INTERVAL);
 
