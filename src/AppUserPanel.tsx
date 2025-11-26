@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import {QuotaDashboard} from "@/components/business/QuotaDashboard";
 import {UserListItem} from "@/components/business/UserListItem.tsx";
 import {maskEmail} from "@/utils/username-masking.ts";
+import {useAppGlobalLoader} from "@/modules/use-app-global-loader.ts";
 
 export function AppUserPanel() {
   const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
@@ -21,6 +22,7 @@ export function AppUserPanel() {
   const languageServerUserInfo = useLanguageServerUserInfo();
   const { isLanguageServerStateInitialized } = useLanguageServerState();
   const currentAntigravityAccount = useCurrentAntigravityAccount();
+  const appGlobalLoader = useAppGlobalLoader();
 
   // 用户详情处理
   const handleUserClick = useCallback((user: AntigravityAccount) => {
@@ -86,23 +88,10 @@ export function AppUserPanel() {
 
   const handleSwitchAccount = async (backupName: string) => {
     try {
-      // 显示正在切换的提示
-      toast.loading(`正在切换到用户: ${maskEmail(backupName)}...`, {
-        id: `switching-${backupName}`,
-      });
-
+      appGlobalLoader.open({label: `正在切换到用户: ${maskEmail(backupName)}...`});
       await antigravityAccount.switchUser(backupName);
-
-      // 切换成功，替换loading提示为成功提示
-      toast.success(`✅ 已成功切换到用户: ${maskEmail(backupName)}`, {
-        id: `switching-${backupName}`,
-        duration: 3000,
-      });
-    } catch (error) {
-      toast.error(`❌ 切换用户失败: ${error}`, {
-        id: `switching-${backupName}`,
-        duration: 4000,
-      });
+    } finally {
+      appGlobalLoader.close();
     }
   };
 
@@ -185,7 +174,7 @@ export function AppUserPanel() {
         isOpen={isClearDialogOpen}
         onOpenChange={setIsClearDialogOpen}
         title="确认清空所有备份"
-        description={`此操作将永久删除所有 ${antigravityAccount.users.length} 个用户备份文件，且无法恢复。请确认您要继续此操作吗？`}
+        description={`此操作将永久删除所有 ${antigravityAccount.users.length} 个账户，且无法恢复。请确认您要继续此操作吗？`}
         onConfirm={confirmClearAllBackups}
         onCancel={() => setIsClearDialogOpen(false)}
         variant="destructive"

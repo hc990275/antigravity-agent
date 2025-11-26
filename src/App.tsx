@@ -10,6 +10,7 @@ import {AntigravityPathService} from './services/antigravity-path-service';
 import {useLanguageServerState} from "@/hooks/use-language-server-state.ts";
 import {logger} from './utils/logger';
 import {AppUserPanel} from "@/AppUserPanel.tsx";
+import {AppGlobalLoader} from "@/AppGlobalLoader.tsx";
 
 function App() {
   // ========== 应用状态 ==========
@@ -126,6 +127,7 @@ function App() {
       position="bottom-right"
       reverseOrder={false}
     />
+    <AppGlobalLoader/>
   </>;
 }
 
