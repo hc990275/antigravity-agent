@@ -1,8 +1,7 @@
 use std::sync::Mutex;
 use tauri::{
-  image::Image,
-  tray::{MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent},
-  AppHandle, Manager,
+    tray::{MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager,
 };
 
 use super::events::handle_menu_event;
@@ -144,7 +143,7 @@ impl SystemTrayManager {
             return Ok(());
         }
 
-        let mut builder = TrayIconBuilder::new()
+        let builder = TrayIconBuilder::new()
             .menu(&menu)
             .tooltip("Antigravity Agent")
             .on_menu_event(|app, event| {
@@ -166,11 +165,8 @@ impl SystemTrayManager {
                         let _ = window.set_focus();
                     }
                 }
-            });
-
-        if let Some(icon) = self.load_icon() {
-            builder = builder.icon(icon);
-        }
+            })
+            .icon(app_handle.default_window_icon().unwrap().clone());
 
         let tray = builder.build(app_handle).map_err(|e| e.to_string())?;
         *tray_lock = Some(tray);
@@ -189,24 +185,6 @@ impl SystemTrayManager {
             }
         }
         println!("✅ 系统托盘图标已销毁");
-    }
-
-    /// 加载图标资源
-    fn load_icon(&self) -> Option<Image<'static>> {
-        let icon_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("icons")
-            .join("tray-icon.png");
-
-        if icon_path.exists() {
-            if let Ok(icon_data) = std::fs::read(icon_path) {
-                if let Ok(image) = image::load_from_memory(&icon_data) {
-                    let rgba = image.to_rgba8();
-                    let (w, h) = rgba.dimensions();
-                    return Some(Image::new_owned(rgba.into_raw(), w, h));
-                }
-            }
-        }
-        None
     }
 
     /// 重建并更新菜单（用于账户列表更新）

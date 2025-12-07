@@ -1,6 +1,6 @@
 use tauri::{
-  menu::{MenuBuilder, MenuItem, SubmenuBuilder},
-  AppHandle, Manager, Wry,
+    menu::{MenuBuilder, MenuItem, SubmenuBuilder},
+    AppHandle, Manager, Wry,
 };
 
 /// 构建托盘菜单

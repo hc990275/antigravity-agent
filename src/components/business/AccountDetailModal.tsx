@@ -1,10 +1,11 @@
 import React, {useState} from 'react';
-import {Check, Copy, Key, Settings, User} from 'lucide-react';
+import {Check, Clock, Copy, Key, User} from 'lucide-react';
 import type {AntigravityAccount} from '@/commands/types/account.types';
 import {BaseButton} from '@/components/base-ui/BaseButton';
 import {cn} from '@/utils/utils';
 import {logger} from '@/utils/logger';
 import {Modal} from "antd";
+import {maskEmail} from "@/utils/string-masking.ts";
 
 interface BusinessUserDetailProps {
   isOpen: boolean;
@@ -141,11 +142,11 @@ const BusinessUserDetail: React.FC<BusinessUserDetailProps> = ({
       footer={null}
       open={isOpen}
       onCancel={() => onOpenChange(false)}
-      title={<div className={"flex flex-row items-center gap-0.5"}>
+    >
+      {<div className={"flex flex-row items-center gap-0.5"}>
         <User className="h-4 w-4 text-gray-500"/>
         <span>用户详情</span>
       </div>}
-    >
       <div className="p-5 space-y-6 max-h-[70vh] overflow-y-auto">
         {/* 用户头像和基本信息 */}
         <div className="flex items-center gap-4">
@@ -173,15 +174,17 @@ const BusinessUserDetail: React.FC<BusinessUserDetailProps> = ({
           copyable
           fieldName="api_key"
         />
-
-        {/* 用户设置 */}
         <InfoItem
-          icon={<Settings className="h-4 w-4 text-gray-500"/>}
-          label="设置数据"
-          value={user.user_settings}
+          icon={<Clock className="h-4 w-4 text-gray-500"/>}
+          label="最近切换时间"
+          value={formatDateTime(user.last_switched)}
+        />
+        <InfoItem
+          icon={<Clock className="h-4 w-4 text-gray-500"/>}
+          label="用户 ID"
+          value={maskEmail(user.id)}
           copyable
-          fieldName="user_settings"
-          isMultiline
+          fieldName="id"
         />
       </div>
     </Modal>
