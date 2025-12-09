@@ -63,7 +63,7 @@ jobs:
             - **Intel Mac**: `Antigravity Agent_x86_64.dmg`
 
             ### Linux
-            - **AppImage**: `antigravity-agent.AppImage.nightly` - 通用格式
+            - **AppImage**: `antigravity-agent.AppImage.nightly`
             - **Debian/Ubuntu**: `antigravity-agent_amd64.deb`
 
             ---
