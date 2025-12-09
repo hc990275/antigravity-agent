@@ -2,10 +2,10 @@
 //!
 //! 使用 Tauri 2.9 内置的 tray API 实现后端控制托盘
 
+use crate::app_settings::AppSettingsManager;
 use tauri::menu::{Menu, MenuBuilder, MenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, Emitter, Manager};
-use crate::app_settings::AppSettingsManager;
 
 /// 创建系统托盘（返回托盘实例）
 pub fn create_tray_with_return(app: &AppHandle) -> Result<TrayIcon, String> {

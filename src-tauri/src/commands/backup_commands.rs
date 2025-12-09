@@ -1,10 +1,11 @@
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::Path;
+use std::fs;
+use tauri::State;
+
 /// 备份相关命令
 /// 负责配置文件和账户的备份、恢复、删除等操作
-use tauri::State;
 
 /// 备份数据收集结构
 #[derive(Serialize, Deserialize, Debug)]
@@ -28,115 +29,6 @@ pub struct RestoreResult {
 pub struct FailedBackup {
     filename: String,
     error: String,
-}
-
-use std::fs;
-use std::io::Write;
-use walkdir::WalkDir;
-use zip::{write::FileOptions, ZipWriter};
-
-/// 创建配置文件备份
-#[tauri::command]
-pub async fn backup_profile(
-    name: String,
-    source_path: String,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
-    let source = Path::new(&source_path);
-    if !source.exists() {
-        return Err("源路径不存在".to_string());
-    }
-
-    let backup_dir = state.config_dir.join("backups");
-    fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {}", e))?;
-
-    let backup_file = backup_dir.join(format!("{}.zip", name));
-
-    // 创建 ZIP 压缩文件
-    let file = fs::File::create(&backup_file).map_err(|e| format!("创建备份文件失败: {}", e))?;
-    let mut zip = ZipWriter::new(file);
-    let options: FileOptions<()> = FileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated)
-        .unix_permissions(0o755);
-
-    // 遍历源目录并添加到 ZIP
-    for entry in WalkDir::new(source) {
-        let entry = entry.map_err(|e| format!("遍历目录失败: {}", e))?;
-        let path = entry.path();
-        let name = path
-            .strip_prefix(source)
-            .map_err(|e| format!("处理路径失败: {}", e))?;
-
-        if path.is_file() {
-            let mut file = fs::File::open(path).map_err(|e| format!("打开文件失败: {}", e))?;
-            zip.start_file(name.to_string_lossy(), options)
-                .map_err(|e| format!("添加文件到压缩包失败: {}", e))?;
-            let mut buffer = Vec::new();
-            use std::io::Read;
-            file.read_to_end(&mut buffer)
-                .map_err(|e| format!("读取文件失败: {}", e))?;
-            zip.write_all(&buffer)
-                .map_err(|e| format!("写入压缩包失败: {}", e))?;
-        }
-    }
-
-    zip.finish().map_err(|e| format!("完成压缩失败: {}", e))?;
-
-    // 更新配置信息
-    let _profile_info = crate::ProfileInfo {
-        name: name.clone(),
-        source_path: source_path.clone(),
-        backup_path: backup_file.to_string_lossy().to_string(),
-        created_at: chrono::Local::now().to_rfc3339(),
-        last_updated: chrono::Local::now().to_rfc3339(),
-    };
-
-    // 这里应该更新状态，但由于 State 是不可变的，我们需要其他方式
-    // 暂时返回成功信息
-
-    Ok(format!("备份成功: {}", backup_file.display()))
-}
-
-/// 恢复配置文件备份
-#[tauri::command]
-pub async fn restore_profile(
-    name: String,
-    target_path: String,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
-    let backup_dir = state.config_dir.join("backups");
-    let backup_file = backup_dir.join(format!("{}.zip", name));
-
-    if !backup_file.exists() {
-        return Err("备份文件不存在".to_string());
-    }
-
-    let target = Path::new(&target_path);
-    fs::create_dir_all(target).map_err(|e| format!("创建目标目录失败: {}", e))?;
-
-    // 解压文件
-    let file = fs::File::open(&backup_file).map_err(|e| format!("打开备份文件失败: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("读取压缩文件失败: {}", e))?;
-
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .map_err(|e| format!("解压文件失败: {}", e))?;
-        let out_path = target.join(file.mangled_name());
-
-        if file.name().ends_with('/') {
-            fs::create_dir_all(&out_path).map_err(|e| format!("创建目录失败: {}", e))?;
-        } else {
-            if let Some(p) = out_path.parent() {
-                fs::create_dir_all(p).map_err(|e| format!("创建父目录失败: {}", e))?;
-            }
-            let mut out_file =
-                fs::File::create(&out_path).map_err(|e| format!("创建文件失败: {}", e))?;
-            std::io::copy(&mut file, &mut out_file).map_err(|e| format!("写入文件失败: {}", e))?;
-        }
-    }
-
-    Ok(format!("还原成功到: {}", target_path))
 }
 
 /// 获取最近使用的账户列表（基于文件修改时间排序）

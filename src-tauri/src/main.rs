@@ -114,8 +114,6 @@ fn main() {
         .manage(AppState::default())
         .setup(|app| setup::init(app))
         .invoke_handler(tauri::generate_handler![
-            backup_profile,
-            restore_profile,
             get_recent_accounts,
             collect_backup_contents,
             restore_backup_files,
