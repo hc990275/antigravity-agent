@@ -63,7 +63,7 @@ jobs:
             - **Intel Mac**: `Antigravity Agent_x86_64.dmg`
 
             ### Linux
-            - **AppImage**: `antigravity-agent.AppImage.nightly` - 通用格式
+            - **AppImage**: `antigravity-agent_amd64.AppImage` - 通用格式
             - **Debian/Ubuntu**: `antigravity-agent_amd64.deb`
 
             ---
@@ -199,6 +199,20 @@ jobs:
         run: |
           echo "=== Starting file rename process ==="
 
+          rename_with_sig() {
+            local file="$1"
+            local new_name="$2"
+
+            if [ ! -f "$file" ] || [ "$file" = "$new_name" ]; then
+              return 0
+            fi
+
+            mv "$file" "$new_name"
+            if [ -f "${file}.sig" ]; then
+              mv "${file}.sig" "${new_name}.sig"
+            fi
+          }
+
           # 获取构建产物目录
           # 所有平台都使用 target triple
           BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle"
@@ -226,29 +240,29 @@ jobs:
             ls -la "$BUNDLE_DIR"
           fi
 
-          # macOS 处理 - 只处理 DMG 文件
+          # macOS 处理
           if [ "${{ matrix.platform }}" = "macos-latest" ]; then
-            # dmg 文件
             if [ -d "$BUNDLE_DIR/dmg" ]; then
-              cd "$BUNDLE_DIR/dmg/"
-              for file in *.dmg; do
-                if [ -f "$file" ]; then
-                  # 先检查文件名是否已经包含架构
-                  if echo "$file" | grep -q "_${{ matrix.arch }}"; then
-                    # 如果已经包含架构，只移除版本号
-                    new_name=$(echo "$file" | sed -E "s/Antigravity Agent_[0-9]+\.[0-9]+\.[0-9]+(_${{ matrix.arch }})/Antigravity Agent\1/")
-                  else
-                    # 如果不包含架构，移除版本号并添加架构
-                    new_name=$(echo "$file" | sed -E "s/Antigravity Agent_[0-9]+\.[0-9]+\.[0-9]+/Antigravity Agent_${{ matrix.arch }}/")
+              (
+                cd "$BUNDLE_DIR/dmg/"
+                for file in *.dmg; do
+                  if [ -f "$file" ]; then
+                    rename_with_sig "$file" "Antigravity Agent_${{ matrix.arch }}.dmg"
                   fi
-                  if [ "$file" != "$new_name" ]; then
-                    mv "$file" "$new_name"
-                    echo "Renamed dmg: $file -> $new_name"
-                  else
-                    echo "DMG already has correct name: $file"
+                done
+              )
+            fi
+
+            # updater bundle (required for macOS auto-update)
+            if [ -d "$BUNDLE_DIR/macos" ]; then
+              (
+                cd "$BUNDLE_DIR/macos/"
+                for file in *.app.tar.gz; do
+                  if [ -f "$file" ]; then
+                    rename_with_sig "$file" "Antigravity Agent_${{ matrix.arch }}.app.tar.gz"
                   fi
-                fi
-              done
+                done
+              )
             fi
           fi
 
@@ -256,30 +270,26 @@ jobs:
           if [ "${{ matrix.platform }}" = "windows-latest" ]; then
             # MSI 文件
             if [ -d "$BUNDLE_DIR/msi" ]; then
-              cd "$BUNDLE_DIR/msi/"
-              for file in *.msi; do
-                if [ -f "$file" ]; then
-                  new_name=$(echo "$file" | sed -E 's/Antigravity Agent_[0-9]+\.[0-9]+\.[0-9]+_x64-setup/Antigravity Agent_x64-setup/')
-                  if [ "$file" != "$new_name" ]; then
-                    mv "$file" "$new_name"
-                    echo "Renamed MSI: $file -> $new_name"
+              (
+                cd "$BUNDLE_DIR/msi/"
+                for file in *.msi; do
+                  if [ -f "$file" ]; then
+                    rename_with_sig "$file" "Antigravity Agent_x64-setup.msi"
                   fi
-                fi
-              done
+                done
+              )
             fi
 
             # NSIS 文件 - 实际生成的是 .exe 文件
             if [ -d "$BUNDLE_DIR/nsis" ]; then
-              cd "$BUNDLE_DIR/nsis/"
-              for file in *.exe; do
-                if [ -f "$file" ]; then
-                  new_name=$(echo "$file" | sed -E 's/Antigravity Agent_[0-9]+\.[0-9]+\.[0-9]+_x64-setup/Antigravity Agent_x64-setup/')
-                  if [ "$file" != "$new_name" ]; then
-                    mv "$file" "$new_name"
-                    echo "Renamed NSIS: $file -> $new_name"
+              (
+                cd "$BUNDLE_DIR/nsis/"
+                for file in *.exe; do
+                  if [ -f "$file" ]; then
+                    rename_with_sig "$file" "Antigravity Agent_x64-setup.exe"
                   fi
-                fi
-              done
+                done
+              )
             fi
           fi
 
@@ -287,30 +297,30 @@ jobs:
           if [ "${{ matrix.platform }}" = "ubuntu-latest" ]; then
             # AppImage
             if [ -d "$BUNDLE_DIR/appimage" ]; then
-              cd "$BUNDLE_DIR/appimage/"
-              for file in *.AppImage; do
-                if [ -f "$file" ]; then
-                  new_name=$(echo "$file" | sed -E 's/Antigravity Agent_[0-9]+\.[0-9]+\.[0-9]+_amd64/antigravity-agent/')
-                  if [ "$file" != "$new_name" ]; then
-                    mv "$file" "${new_name}.AppImage.nightly"
-                    echo "Renamed AppImage: $file -> ${new_name}.AppImage.nightly"
+              (
+                cd "$BUNDLE_DIR/appimage/"
+                for file in *.AppImage *.AppImage.tar.gz; do
+                  if [ -f "$file" ]; then
+                    if echo "$file" | grep -q "\\.AppImage\\.tar\\.gz$"; then
+                      rename_with_sig "$file" "antigravity-agent_amd64.AppImage.tar.gz"
+                    else
+                      rename_with_sig "$file" "antigravity-agent_amd64.AppImage"
+                    fi
                   fi
-                fi
-              done
+                done
+              )
             fi
 
             # deb 包
             if [ -d "$BUNDLE_DIR/deb" ]; then
-              cd "$BUNDLE_DIR/deb/"
-              for file in *.deb; do
-                if [ -f "$file" ]; then
-                  new_name=$(echo "$file" | sed -E 's/Antigravity Agent_[0-9]+\.[0-9]+\.[0-9]+_amd64/antigravity-agent_amd64/')
-                  if [ "$file" != "$new_name" ]; then
-                    mv "$file" "$new_name"
-                    echo "Renamed deb: $file -> $new_name"
+              (
+                cd "$BUNDLE_DIR/deb/"
+                for file in *.deb; do
+                  if [ -f "$file" ]; then
+                    rename_with_sig "$file" "antigravity-agent_amd64.deb"
                   fi
-                fi
-              done
+                done
+              )
             fi
           fi
 
@@ -338,7 +348,7 @@ jobs:
 
             # 上传所有子目录中的文件
             echo "=== Uploading files ==="
-            find "$BUNDLE_DIR" -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.sig" -o -name "*.dmg" \) | while read file; do
+            find "$BUNDLE_DIR" -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.deb" -o -name "*.sig" -o -name "*.dmg" -o -name "*.app.tar.gz" \) | while read file; do
               echo "Uploading: $file"
               ls -lh "$file"  # 显示文件大小
               gh release upload autobuild "$file" --clobber --repo "${{ github.repository }}"
