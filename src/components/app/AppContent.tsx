@@ -9,6 +9,7 @@ import {maskEmail} from "@/lib/string-masking.ts";
 import {useAppGlobalLoader} from "@/modules/use-app-global-loader.ts";
 import {AccountSessionList, AccountSessionListAccountItem} from "@/components/business/AccountSessionList.tsx";
 import AccountsListToolbar, {type ListToolbarValue} from "@/components/business/AccountsListToolbar.tsx";
+import {logger} from "@/lib/logger.ts";
 
 const tierRank: Record<UserTier, number> = {
   'g1-ultra-tier': 0,
@@ -54,15 +55,25 @@ export function AppContent() {
       clearInterval(fetchAccountAdditionDataTimer.current)
     }
 
-    fetchAccountAdditionDataTimer.current = setInterval(() => {
-      antigravityAccount.accounts.forEach(user => {
-        accountAdditionData.update(user)
+    const task = () => {
+      antigravityAccount.accounts.forEach(async (user) => {
+        try {
+          await accountAdditionData.update(user)
+        } catch (e) {
+          logger.error('获取用户额外数据失败', {
+            module: 'AppContent',
+            email: user.context.email,
+            error: e instanceof Error ? e.message : String(e)
+          })
+        }
       })
+    }
+
+    fetchAccountAdditionDataTimer.current = setInterval(() => {
+      task()
     }, 1000 * 30)
 
-    antigravityAccount.accounts.forEach(user => {
-      accountAdditionData.update(user)
-    })
+    task()
 
     return () => {
       clearInterval(fetchAccountAdditionDataTimer.current)
